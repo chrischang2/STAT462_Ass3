@@ -241,7 +241,7 @@ plot_func_clus <- function(data, label, title = "") {
 plot_func_clus(dat, k.clus$cluster, "k-means clustering result")
 
 # Plot actual Class labels
-plot_func(train, train$Class, "Actual Wine Classes")
+plot_func(dat, train$Class, "Actual Wine Classes")
 ```
 
 ## Q3.
@@ -291,5 +291,5 @@ k.clus <- kmeans(dat, 3)
 plot_func_clus(dat, k.clus$cluster, "k-means clustering result")
 
 # Plot actual Class labels
-plot_func(scaled_train, train$Class, "Actual Wine Classes")
+plot_func(dat, train$Class, "Actual Wine Classes")
 ```
