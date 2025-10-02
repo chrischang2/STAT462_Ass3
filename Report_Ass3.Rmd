@@ -213,9 +213,7 @@ plot_func(train_no_class, train$Class, "Actual Wine Classes")
 
 ## Q2.
 
-Do the same using the k-means algorithm, for k=3. For visualisation, you can pick the two
-features that were sufficient for classification in question A, and plot datapoints in these two
-dimensions, comparing actual classes and predicted cluster labels.
+Do the same using the k-means algorithm, for k=3. For visualisation, you can pick the two features that were sufficient for classification in question A, and plot datapoints in these two dimensions, comparing actual classes and predicted cluster labels.
 
 ```{r}
 dat <- train[,c("Proline", "Flavanoids")]
@@ -251,11 +249,7 @@ plot_func(scaled_train, train$Class, "Actual Wine Classes")
 
 ## Q3.
 
-You will likely not get great results, because your features vary on very different orders of
-magnitude (for example, Nonflavanoid.phenols is mostly between 0 and 1, but Proline is
-in the 1000 range). Normalise all numerical features using either z-score transformation or
-min-max normalisation, which will bring them into comparable orders of magnitude. Then
-repeat parts 1. and 2., and see whether your results improve.
+You will likely not get great results, because your features vary on very different orders of magnitude (for example, Nonflavanoid.phenols is mostly between 0 and 1, but Proline is in the 1000 range). Normalise all numerical features using either z-score transformation or min-max normalisation, which will bring them into comparable orders of magnitude. Then repeat parts 1. and 2., and see whether your results improve.
 
 ```{r}
 # Remove Class column for clustering
