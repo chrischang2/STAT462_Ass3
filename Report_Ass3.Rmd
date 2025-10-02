@@ -114,6 +114,11 @@ bag.er <- mean(bag.pred != test$Class)
 bag.er
 ```
 
+```{r}
+# Report most important features
+varImpPlot(bag.tree)
+```
+
 # Part B
 
 Clustering the wine dataset (Hierarchical clustering and k-means)
@@ -200,8 +205,14 @@ plot_func <- function(data, labels, title = "") {
     theme_minimal()
 }
 
+# Manual remapping - adjust these numbers based on what you see
+# If cluster 1 should be class 2, cluster 2 should be class 1, cluster 3 should be class 3:
+manual_map <- c(3, 1, 2)  # Adjust these based on your dendrogram
+remapped_clusters <- manual_map[clusters]
+
+
 # Plot hierarchical clustering result
-plot_func(train_no_class, clusters, "Hierarchical Clustering (3 Clusters)")
+plot_func(train_no_class, remapped_clusters, "Hierarchical Clustering (3 Clusters)")
 
 # Plot actual Class labels
 plot_func(train_no_class, train$Class, "Actual Wine Classes")
@@ -238,10 +249,15 @@ plot_func_clus <- function(data, label, title = "") {
   return(p)
 }  
 
-plot_func_clus(dat, k.clus$cluster, "k-means clustering result")
+# Manual remapping - adjust these numbers based on what you see
+# If cluster 1 should be class 2, cluster 2 should be class 1, cluster 3 should be class 3:
+manual_map <- c(3, 1, 2)  # Adjust these based on your dendrogram
+remapped_clusters <- manual_map[k.clus$cluster]
+
+plot_func_clus(dat, remapped_clusters, "k-means clustering result")
 
 # Plot actual Class labels
-plot_func(dat, train$Class, "Actual Wine Classes")
+plot_func_clus(dat, train$Class, "Actual Wine Classes")
 ```
 
 ## Q3.
@@ -275,11 +291,16 @@ rect.hclust(hc.complete, k = 3, border = "red")
 # Cut tree into 3 clusters
 clusters <- cutree(hc.complete, k = 3)
 
+# Manual remapping - adjust these numbers based on what you see
+# If cluster 1 should be class 2, cluster 2 should be class 1, cluster 3 should be class 3:
+manual_map <- c(3, 1, 2)  # Adjust these based on your dendrogram
+remapped_clusters <- manual_map[clusters]
+
 # Plot hierarchical clustering result
-plot_func(train_no_class, clusters, "Hierarchical Clustering (3 Clusters)")
+plot_func(scaled_train, remapped_clusters, "Hierarchical Clustering (3 Clusters)")
 
 # Plot actual Class labels
-plot_func(train_no_class, train$Class, "Actual Wine Classes")
+plot_func(scaled_train, train$Class, "Actual Wine Classes")
 ```
 
 ```{r}
@@ -288,8 +309,20 @@ dat <- as.data.frame(scale(dat))
 
 k.clus <- kmeans(dat, 3)
 
+# This colour remapping code is from Claude
+# Create a mapping from k-means clusters to actual classes
+# Find which cluster number corresponds to which class
+cluster_to_class <- sapply(1:3, function(cluster) {
+  # Get the most common actual class for this cluster
+  cluster_members <- train$Class[k.clus$cluster == cluster]
+  as.numeric(names(sort(table(cluster_members), decreasing = TRUE)[1]))
+})
+
+# Remap cluster labels to match actual classes
+remapped_clusters <- cluster_to_class[k.clus$cluster]
+
 plot_func_clus(dat, k.clus$cluster, "k-means clustering result")
 
 # Plot actual Class labels
-plot_func(dat, train$Class, "Actual Wine Classes")
+plot_func_clus(dat, train$Class, "Actual Wine Classes")
 ```
