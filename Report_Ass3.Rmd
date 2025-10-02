@@ -2,7 +2,9 @@
 title: "STAT462_Ass3"
 author: "Chris Chang"
 date: "2025-10-01"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -154,12 +156,7 @@ Perform hierarchical clustering on the wine dataset, but do not include the Clas
 # Remove Class column for clustering
 train_no_class <- train[, !(names(train) %in% "Class")]
 
-# Scale all predictors
-# scaled_train <- scale(train_no_class)
-# scaled_train <- as.data.frame(scaled_train)
-
 # Distance matrix
-dist_matrix <- dist(scaled_train)
 dist_matrix <- dist(train_no_class)
 
 # perform hierarchical clustering
@@ -244,7 +241,7 @@ plot_func_clus <- function(data, label, title = "") {
 plot_func_clus(dat, k.clus$cluster, "k-means clustering result")
 
 # Plot actual Class labels
-plot_func(scaled_train, train$Class, "Actual Wine Classes")
+plot_func(train, train$Class, "Actual Wine Classes")
 ```
 
 ## Q3.
