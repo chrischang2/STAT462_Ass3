@@ -51,8 +51,54 @@ text(classification.tree, pretty = 0, cex = 0.7)
 
 ```
 
+There are 7 terminal nodes in the initial classification tree, and the misclassification error rate is 5.6%.
+
 ```{r}
+# Predict on the testing data set using the initial classification tree.
+test_pred <- predict(classification.tree, newdata = test, type = "class")
+
+# Compute the misclassification error rate on test data. 
+pred_error_rate <- mean(test_pred != test$Class)
+cat("The predicted error rate(initial tree) on the testing data set is ",  
+    round(pred_error_rate * 100, 2), "%\n")
+```
+
+```{r}
+set.seed(1)
+cv_classification <- cv.tree(classification.tree, FUN = prune.misclass) 
+
+# Plot the cross-validation results
+plot(cv_classification$size, cv_classification$dev, type = "b")
+title(main = "Figure 2. Cross-Validation: Deviance vs Tree Size", cex.main = 0.8)
+
+
+# The optimal tree size corresponding to the lowest deviance.
+best_size <- cv_classification$size[which.min(cv_classification$dev)]
+best_dev  <- min(cv_classification$dev)
+
+# Highlight the optimal tree size
+points(best_size, best_dev, col = "purple", pch = 19, cex = 1.5)
+
+cat("The optimal tree size of the pruned tree with the lowest deviance is ", best_size)
+
+# Use the optimal tree size to prune the tree
+pruned_tree <- prune.misclass(classification_tree, best = best_size)
+plot(pruned_tree)
+text(pruned_tree, pretty = 0, cex = 0.7)
+title(main = "Figure 3. Pruned Classification Tree (After Cross-Validation)", 
+      cex.main = 0.8)
+
+```
+
+Using the training datasets, the cross-validation procedure chose the same tree size as the initial tree (7 terminal nodes). Thus, pruning did not reduce the complexity of the tree, and the predicted error rate on the testing data remained unchanged (about 19.44 %).
+
+```{r}
+# set.seed(10)
 cv.classification <- cv.tree(classification.tree, FUN = prune.misclass) 
+
+# Plot the cross-validation results
+plot(cv.classification$size, cv_classification$dev, type = "b")
+title(main = "Figure 2. Cross-Validation: Deviance vs Tree Size", cex.main = 0.8)
 
 # Find out the best tree size that corresponds to the lowest deviance
 best.size <- cv.classification$size[which.min(cv.classification$dev)]
@@ -91,11 +137,50 @@ text(pruned.tree_2, pretty = 0, cex = 0.7)
 
 ```
 
+```{r}
+summary(pruned.tree_2)
+```
+
+Based on the classification tree shown in Figure 1, the tree should be pruned to a size of 4 in order to retain only two predictive features: Proline and Flavanoids. We therefore prune the initial tree to this size.
+
+```{r,fig.width=7, fig.height=5}
+# Visualize the pruned tree with two features
+library(ggplot2)
+df_plot <- test[, c("Proline", "Flavanoids", "Class")]
+
+xmin <- min(df_plot$Proline, na.rm = TRUE)
+xmax <- max(df_plot$Proline, na.rm = TRUE)
+ymin <- min(df_plot$Flavanoids-0.5 , na.rm = TRUE)
+ymax <- max(df_plot$Flavanoids+0.5, na.rm = TRUE)
+
+x_root <- 755       
+y_left <- 1.235     
+y_right <- 2.165    
+
+segs <- data.frame(
+  xstart = c(x_root, xmin, x_root),
+  xend   = c(x_root, x_root, xmax),
+  ystart = c(ymin, y_left, y_right),
+  yend   = c(ymax, y_left, y_right),
+  type = c("root_v", "left_h", "right_h")
+)
+
+ggplot(df_plot, aes(x = Proline, y = Flavanoids, color = Class)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_segment(data = segs, aes(x = xstart, xend = xend, y = ystart, yend = yend),
+               inherit.aes = FALSE, color = "black", linewidth = 0.6) +
+  theme_minimal()+
+  labs(title = "Figure 5. Wine Classification: Decision Boundaries with Proline & Flavanoids")+
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"))
+
+```
+
 ## Q3.
 
 Fit a bagged classification tree model and/or a random forest to see whether you can improve on your single tree's performance.
 
 ```{r}
+set.seed(1)
 # Count the number of predictors. Class needs to be excluded. 
 num_predictors <- ncol(train) -1
 
@@ -115,6 +200,45 @@ bag.er
 ```
 
 ```{r}
+# Fit the random forests
+set.seed(1)
+
+# Fit a random_forests using two features 
+random_forests <- randomForest(Class ~ ., data = train, mtry = 2, importance=TRUE)
+
+# Predict on the testing set using the random_forests
+random_forests_pred <- predict(random_forests, newdata = test)
+
+# Compute the error rate on the testing data set
+random_forests_error_rate <- mean(random_forests_pred != test$Class)
+random_forests_error_rate
+```
+
+Using the bagged classification tree and random forests, the predicted error rate on the testing data set drops to 0%, indicating that these ensemble methods substantially outperform the single classification tree (both the initial(19.44%) and pruned versions(19.44% and 16.67%)).
+
+The 0% error rate is remarkable, and would normally be cause for skepticism. Looking at the class counts, we can see that the classes are well-balanced, and the amount of data, while on the smaller side, is still sufficient for machine learning. We can conclude, then that there are strong, learnable patterns, with well-separated classes, and that the decision boundary must be complex, as the single trees struggled, but not too complex, as the models were able to classify perfectly.
+
+We can also infer from the training metrics that we may have been lucky, as the model did not have perfect performance on the training set, despite the finding that the proline and flavanoids features are the most informative.
+
+```{r}
+library(dplyr)
+
+show_class_balance <- function(df, name) {
+  df %>%
+    count(Class, name = "Count") %>%
+    mutate(Proportion = round(Count / sum(Count), 3),
+           Dataset = name)
+}
+
+balance_summary <- bind_rows(
+  show_class_balance(train, "Train"),
+  show_class_balance(test, "Test")
+)
+
+balance_summary
+```
+
+```{r}
 # Report most important features
 varImpPlot(bag.tree)
 ```
@@ -124,33 +248,33 @@ varImpPlot(bag.tree)
 Clustering the wine dataset (Hierarchical clustering and k-means)
 
 ```{r}
-plot_func <- function(data, label, title = "") {
-
-   # Ensure labels are factor
-  labels <- factor(labels)
-  
-  # Convert to data frame if needed
-  data <- as.data.frame(data)
-  
-  # PCA for 2D reduction
-  pca <- prcomp(data, scale. = TRUE)
-  pca_df <- as.data.frame(pca$x[, 1:2])
-  colnames(pca_df) <- c("PC1", "PC2")
-  
-  # Add cluster/class labels
-  pca_df$label <- labels
-  
-
-  # Plot
-  p <- ggplot(pca_df, aes(x = PC1, y = PC2, color = label)) +
-    geom_point(size = 3.0, alpha = 0.7) +
-    scale_color_manual(values = c("#00AFBB", "#FC4E07", "#e7b800", 
-                                  "#006400", "#9400D3", "#FF8C00","#008080")) +
-    labs(title = title, x = "PC1", y = "PC2", color = "Cluster/Class") +
-    theme_grey()
-  return(p)
-}  
-  
+# plot_func <- function(data, label, title = "") {
+# 
+#    # Ensure labels are factor
+#   labels <- factor(labels)
+#   
+#   # Convert to data frame if needed
+#   data <- as.data.frame(data)
+#   
+#   # PCA for 2D reduction
+#   pca <- prcomp(data, scale. = TRUE)
+#   pca_df <- as.data.frame(pca$x[, 1:2])
+#   colnames(pca_df) <- c("PC1", "PC2")
+#   
+#   # Add cluster/class labels
+#   pca_df$label <- labels
+#   
+# 
+#   # Plot
+#   p <- ggplot(pca_df, aes(x = PC1, y = PC2, color = label)) +
+#     geom_point(size = 3.0, alpha = 0.7) +
+#     scale_color_manual(values = c("#00AFBB", "#FC4E07", "#e7b800", 
+#                                   "#006400", "#9400D3", "#FF8C00","#008080")) +
+#     labs(title = title, x = "PC1", y = "PC2", color = "Cluster/Class") +
+#     theme_grey()
+#   return(p)
+# }  
+#   
 ```
 
 ## Q1.
@@ -166,7 +290,7 @@ dist_matrix <- dist(train_no_class)
 
 # perform hierarchical clustering
 hc.complete <- hclust(dist_matrix, method = "complete")
-plot(hc.complete, main = "Hierarchical Clustering (Complete Linkage)", xlab = "", sub = "", cex = .3)
+# plot(hc.complete, main = "Hierarchical Clustering (Complete Linkage)", xlab = "", sub = "", cex = .3)
 
 # Cut tree into 3 clusters
 clusters <- cutree(hc.complete, k = 3)
@@ -177,46 +301,68 @@ rect.hclust(hc.complete, k = 3, border = "red")
 ```
 
 ```{r}
-# Cut tree into 3 clusters
-clusters <- cutree(hc.complete, k = 3)
+# Get cluster assignments
+clusters <- cutree(hc.complete, 3)
+# Compare clusters to actual classes
+cm <- table(Predicted = clusters, Actual = train$Class)
+cm
+```
 
-# 3. PCA-based plotting function
-plot_func <- function(data, labels, title = "") {
-  # Ensure labels is a vector and factor
-  labels <- factor(as.vector(labels))
-  
-  # Convert data to data frame if needed
-  data <- as.data.frame(data)
-  
-  # PCA to reduce to 2D
-  pca <- prcomp(data, scale. = TRUE)
-  pca_df <- as.data.frame(pca$x[, 1:2])
-  colnames(pca_df) <- c("PC1", "PC2")
-  
-  # Add labels
-  pca_df$label <- labels
-  
-  # Plot
-  ggplot(pca_df, aes(x = PC1, y = PC2, color = label)) +
-    geom_point(size = 3, alpha = 0.7) +
-    scale_color_manual(values = c("#00AFBB", "#FC4E07", "#e7b800", 
-                                  "#006400", "#9400D3", "#FF8C00","#008080")) +
-    labs(title = title, x = "PC1", y = "PC2", color = "Cluster/Class") +
-    theme_minimal()
-}
+```{r}
+# get purity
+purity <- sum(apply(cm, 1, max)) / sum(cm)
+cat("\nPurity is", round(purity, 2))
+```
 
-# Manual remapping - adjust these numbers based on what you see
-# If cluster 1 should be class 2, cluster 2 should be class 1, cluster 3 should be class 3:
-manual_map <- c(3, 1, 2)  # Adjust these based on your dendrogram
-remapped_clusters <- manual_map[clusters]
+The confusion matrix shows unsatisfactory reconstruction, with the purity of the confusion matrix being 0.68. During this process, no standardization was performed; therefore, variables with larger absolute magnitudes exerted a dominant effect on the clustering outcome.
 
+```{r,fig.width=7, fig.height=4}
+# Visualise the actual classes compared to the hierarchical clustering results.
+library(patchwork)
+plot_data <- data.frame(
+  Proline = train$Proline,
+  Flavanoids = train$Flavanoids,
+  TrueClass = as.factor(train$Class),
+  Cluster = as.factor(hc_clusters)
+)
 
-# Plot hierarchical clustering result
-plot_func(train_no_class, remapped_clusters, "Hierarchical Clustering (3 Clusters)")
+# Ground Truth
+p1 <- ggplot(plot_data, aes(x = Proline, y = Flavanoids, color = TrueClass)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Actual Classes",
+       x = "Proline", y = "Flavanoids") +
+  theme_minimal()
 
-# Plot actual Class labels
-plot_func(train_no_class, train$Class, "Actual Wine Classes")
+# The clustering results
+p2 <- ggplot(plot_data, aes(x = Proline, y = Flavanoids, color = Cluster)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Hierarchical Clustering",
+       x = "Proline", y = "Flavanoids") +
+  theme_minimal()
 
+final_plot <- p1 + p2 + plot_annotation(
+  title = "Figure 7. Comparison of Actual Classes vs Hierarchical Clustering",
+  theme = theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"))
+)
+
+print(final_plot)
+```
+
+```{r}
+# \# Cut tree into 3 clusters \# clusters \<- cutree(hc.complete, k = 3) \# \# \# \# 3. PCA-based plotting function \# plot_func \<- function(data, labels, title = "") { \# \# Ensure labels is a vector and factor \# labels \<- factor(as.vector(labels)) \#\
+# \# Convert data to data frame if needed \# data \<- as.data.frame(data) \#\
+# \# PCA to reduce to 2D \# pca \<- prcomp(data, scale. = TRUE) \# pca_df \<- as.data.frame(pca$x[, 1:2])
+#   colnames(pca_df) <- c("PC1", "PC2")
+#
+#   # Add labels
+#   pca_df$label \<- labels \#\
+# \# Plot \# ggplot(pca_df, aes(x = PC1, y = PC2, color = label)) + \# geom_point(size = 3, alpha = 0.7) + \# scale_color_manual(values = c("#00AFBB", "#FC4E07", "#e7b800", \# "#006400", "#9400D3", "#FF8C00","#008080")) + \# labs(title = title, x = "PC1", y = "PC2", color = "Cluster/Class") + \# theme_minimal() \# } \# \# \# Manual remapping - adjust these numbers based on what you see \# \# If cluster 1 should be class 2, cluster 2 should be class 1, cluster 3 should be class 3: \# manual_map \<- c(3, 2, 1) \# Adjust these based on your dendrogram \# remapped_clusters \<- manual_map[clusters] \# \# \# \# Plot hierarchical clustering result \# plot_func(train_no_class, remapped_clusters, "Hierarchical Clustering (3 Clusters)")
+
+```
+
+```{r}
+# # Plot actual Class labels
+# plot_func(train_no_class, train$Class, "Actual Wine Classes")
 ```
 
 ## Q2.
@@ -256,6 +402,10 @@ remapped_clusters <- manual_map[k.clus$cluster]
 
 plot_func_clus(dat, remapped_clusters, "k-means clustering result")
 
+
+```
+
+```{r}
 # Plot actual Class labels
 plot_func_clus(dat, train$Class, "Actual Wine Classes")
 ```
